@@ -24,8 +24,15 @@ export async function GET() {
       return NextResponse.json({ error: 'Auth failed', details: authData }, { status: 401 });
     }
 
-    // 2. Probamo da povučemo same oglase sa osnovnog endpointa za oglase
-    const adsRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads', {
+    // 2. Da vidimo prvo šta nam vraća endpoint za informacije o klijentu/agenciji
+    const meRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/me', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const meData = await meRes.json().catch(() => null);
+
+    // 3. Probamo oglase sa query parametrima ako ih traži
+    const adsRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads?per_page=100', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -33,12 +40,13 @@ export async function GET() {
       },
     });
 
-    const adsData = await adsRes.json();
+    const adsData = await adsRes.json().catch(() => []);
 
     return NextResponse.json({
-      status: 'Uspješno povezano!',
-      count: Array.isArray(adsData) ? adsData.length : 'Nije niz',
-      data: adsData
+      status: 'Povezano uspješno!',
+      clientInfo: meData,
+      adsCount: Array.isArray(adsData) ? adsData.length : 'Nije direktan niz',
+      rawData: adsData
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
