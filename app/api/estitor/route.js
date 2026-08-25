@@ -24,15 +24,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Auth failed', details: authData }, { status: 401 });
     }
 
-    // 2. Da vidimo prvo šta nam vraća endpoint za informacije o klijentu/agenciji
-    const meRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/me', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const meData = await meRes.json().catch(() => null);
-
-    // 3. Probamo oglase sa query parametrima ako ih traži
-    const adsRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads?per_page=100', {
+    // 2. Probamo da povučemo reference ID-jeve (ovo znamo da prolazi, ali da vidimo ceo odgovor)
+    const adsRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads/reference-ids', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -40,13 +33,24 @@ export async function GET() {
       },
     });
 
-    const adsData = await adsRes.json().catch(() => []);
+    const adsData = await adsRes.json();
+
+    // 3. Takođe probamo POST zahtev na /ads ako možda traži filtriranje preko tela zahteva
+    const adsPostRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({})
+    });
+
+    const adsPostData = await adsPostRes.json().catch(() => null);
 
     return NextResponse.json({
       status: 'Povezano uspješno!',
-      clientInfo: meData,
-      adsCount: Array.isArray(adsData) ? adsData.length : 'Nije direktan niz',
-      rawData: adsData
+      referenceIdsResult: adsData,
+      postAdsResult: adsPostData
     });
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
