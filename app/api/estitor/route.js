@@ -2,24 +2,44 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    // Ovde dodajemo poziv ka Estitor API-ju
-    const res = await fetch('HTTPS_ESTITOR_API_ENDPOINT_HERE', {
-      headers: {
-        'Content-Type': 'application/json',
-        // 'Authorization': `Bearer ${process.env.ESTITOR_API_KEY}`, // Otkomentariši ako zahtijevaju API ključ
-      },
-      next: { revalidate: 3600 } // Osvežava podatke svakih sat vremena
+    // 1. Autentifikacija i dobijanje tokena sa Estitora
+    const authRes = await fetch('https://api-v2.estitor.com/api/external-clients/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientId: process.env.ESTITOR_CLIENT_ID,
+        clientSecret: process.env.ESTITOR_CLIENT_SECRET,
+      }),
     });
 
-    if (!res.ok) {
-      throw new Error('Neuspešno preuzimanje podataka sa Estitor API-ja');
+    const authData = await authRes.json();
+
+    if (!authRes.ok || !authData.token) {
+      return NextResponse.json(
+        { error: 'Neuspešna autorizacija na Estitor API' },
+        { status: 401 }
+      );
     }
 
-    const data = await res.json();
-    return NextResponse.json(data);
+    // 2. Preuzimanje oglasa (reference ID-jeva)
+    const adsRes = await fetch('https://api-v2.estitor.com/api/v1/external-clients/ads/reference-ids', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${authData.token}`,
+        'Content-Type': 'application/json',
+      },
+      next: { revalidate: 3600 }
+    });
+
+    const adsData = await adsRes.json();
+
+    return NextResponse.json({
+      status: 'Povezano uspješno sa Estitorom!',
+      data: adsData
+    });
   } catch (error) {
     return NextResponse.json(
-      { error: 'Greška pri povezivanju sa Estitorom', details: error.message },
+      { error: 'Greška pri sinhronizaciji', details: error.message },
       { status: 500 }
     );
   }
